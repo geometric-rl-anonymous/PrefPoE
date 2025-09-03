@@ -78,36 +78,27 @@ class Agent(nn.Module):
 
     def get_action_and_value(self, x, action=None, deterministic=False, eval_std=None):
         features = self.backbone(x)
-
-        # 主policy和preference网络的代码保持不变...
         action_mean =  torch.tanh(self.actor_mean(features))
         action_logstd = self.actor_logstd.expand_as(action_mean)
         action_std = torch.exp(action_logstd)
-
         pref_mean = torch.tanh(self.preference_mean(features))
         pref_std = torch.exp(self.preference_logstd.expand_as(action_mean)).clamp(min=1e-3, max=2.0)
-
-        # PoE fusion - 保持不变
         combined_mean, combined_std = self.product_of_experts_fusion(
             action_mean, action_std, pref_mean, pref_std
         )
-
-        # 🆕 这里是新加的部分
         if deterministic:
-            action = combined_mean  # 直接取均值
+            action = combined_mean
             probs = Normal(combined_mean, torch.ones_like(combined_std) * 1e-8)
         elif eval_std is not None:
-            # 使用固定的小标准差
+
             fixed_std = torch.full_like(combined_mean, eval_std)
             probs = Normal(combined_mean, fixed_std)
             if action is None:
                 action = probs.sample()
         else:
-            # 原来的代码保持不变
             probs = Normal(combined_mean, combined_std)
             if action is None:
                 action = probs.sample()
-
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
 
@@ -129,7 +120,7 @@ def make_env(env_id, capture_video=False, video_folder="./evaluation_videos", ga
     """Create environment with EXACT same wrapper order as training"""
 
     def thunk():
-        # 🔧 不使用RecordVideo wrapper，我们手动录制
+
         env = gym.make(env_id, render_mode="rgb_array" if capture_video else None)
 
         # CRITICAL: Use EXACT same wrapper order as training code
@@ -189,10 +180,10 @@ def evaluate_model(model_path, env_id="HalfCheetah-v4", num_episodes=10, capture
     print("\nStarting evaluation...")
 
     for episode in range(num_episodes):
-        # 🎥 手动录制：为每个episode收集帧
+
         frames = [] if capture_video else None
 
-        # 🔧 关键：不重新创建环境，只重置
+
         obs, _ = env.reset()
         obs = torch.FloatTensor(obs).unsqueeze(0).to(device)
 
@@ -205,17 +196,17 @@ def evaluate_model(model_path, env_id="HalfCheetah-v4", num_episodes=10, capture
         done = False
 
         while not done:
-            # 🎥 录制当前帧
+
             if capture_video:
                 frame = env.render()
                 if frame is not None:
                     frames.append(frame)
 
             with torch.no_grad():
-                # 🆕 根据需要选择评估模式
+
                 action, logprob, entropy, value = agent.get_action_and_value(
                     obs,
-                    deterministic=deterministic  # 🔧 改为 True 使用确定性，或者 eval_std=0.1 使用小方差
+                    deterministic=deterministic
                 )
 
                 # Record data
@@ -246,19 +237,19 @@ def evaluate_model(model_path, env_id="HalfCheetah-v4", num_episodes=10, capture
                       f"Normalized Sum={episode_step_rewards:.2f}, Length={episode_length}")
                 break
 
-        # 🎥 保存当前episode的视频
+
         if capture_video and frames:
             try:
                 import imageio
                 video_path = os.path.join(video_folder, f"episode_{episode:03d}.mp4")
                 os.makedirs(video_folder, exist_ok=True)
 
-                # 🔧 修复imageio兼容性问题
+
                 imageio.mimsave(video_path, frames, fps=30, format='mp4')
                 print(f"  📹 Video saved: {video_path}")
             except Exception as e:
                 print(f"  ⚠️ Video save failed with imageio: {e}")
-                # 🔧 备选方案：使用opencv
+
                 try:
                     import cv2
                     video_path = os.path.join(video_folder, f"episode_{episode:03d}.avi")
@@ -321,7 +312,7 @@ def evaluate_model(model_path, env_id="HalfCheetah-v4", num_episodes=10, capture
     if capture_video:
         print(f"Videos saved in: {video_folder}")
         try:
-            # 检查所有视频格式
+
             video_files = [f for f in os.listdir(video_folder) if f.endswith(('.mp4', '.avi'))]
             print(f"Generated {len(video_files)} video files:")
             for vf in sorted(video_files):
@@ -451,19 +442,17 @@ def save_results_json(results, save_path="./evaluation_results.json"):
 
     print(f"Results saved to: {save_path}")
 
-# prefer_HalfCheetah_v444.cleanrl_model最好，更好prefer_HalfCheetah_v999.cleanrl_model
-# test_prefer_clip_cheatv4.cleanrl_model second good  prefer_doubleu.cleanrl_model
+
 def main():
-    """评估多个种子的main函数"""
+
     # Configuration
     MODEL_PATH = "PrefPoE.cleanrl_model"
     ENV_ID = "HalfCheetah-v4"
-    NUM_EPISODES = 10  # 每个种子的episode数
+    NUM_EPISODES = 10
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # 🆕 多种子评估设置
     EVAL_SEEDS = [0, 1, 42, 123, 456, 789, 1234, 2023, 3141, 9999]  # 10个种子
-    CAPTURE_VIDEO_SEED = -1  # 只为这个种子录制视频
+    CAPTURE_VIDEO_SEED = -1
 
     print("🎲 Multi-Seed PPO Model Evaluation")
     print("=" * 60)
@@ -473,17 +462,17 @@ def main():
         return
 
     all_results = []
-    all_episode_rewards = []  # 存储所有episode的奖励
+    all_episode_rewards = []
 
-    # 🆕 数据收集容器
-    all_episode_data = []  # 存储所有episode的详细数据
-    all_seed_data = []  # 存储每个种子的汇总数据
+
+    all_episode_data = []
+    all_seed_data = []
 
     for i, seed in enumerate(EVAL_SEEDS):
         print(f"\n🎲 Seed {i + 1}/{len(EVAL_SEEDS)}: {seed}")
         print("-" * 40)
 
-        # 设置种子
+
         import random
         random.seed(seed)
         np.random.seed(seed)
@@ -491,19 +480,19 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)
 
-        # 决定是否录制视频
+
         capture_video = (seed == CAPTURE_VIDEO_SEED)
 
 
 
-        # 评估
+
         results = evaluate_model(
             model_path=MODEL_PATH,
             env_id=ENV_ID,
             num_episodes=NUM_EPISODES,
             capture_video=capture_video,
             device=DEVICE,
-            deterministic=True  # 🆕 加上这一行，True=确定性，False=随机
+            deterministic=True
         )
 
         if results is None:
@@ -511,9 +500,9 @@ def main():
             continue
 
         all_results.append(results['mean_reward'])
-        all_episode_rewards.extend(results['episode_rewards'])  # 收集所有episode
+        all_episode_rewards.extend(results['episode_rewards'])
 
-        # 🆕 收集详细数据
+
         seed_data = {
             'seed': seed,
             'mean_reward': results['mean_reward'],
@@ -526,7 +515,7 @@ def main():
         }
         all_seed_data.append(seed_data)
 
-        # 为每个episode添加种子信息
+
         for j, reward in enumerate(results['episode_rewards']):
             episode_data = {
                 'seed': seed,
@@ -539,7 +528,7 @@ def main():
 
         print(f"Seed {seed} Result: {results['mean_reward']:.2f} ± {results['std_reward']:.2f}")
 
-    # 🆕 综合统计
+
     print("\n" + "=" * 60)
     print("📊 MULTI-SEED EVALUATION SUMMARY")
     print("=" * 60)
@@ -555,7 +544,7 @@ def main():
         print(f"   Range: [{overall_min:.2f}, {overall_max:.2f}]")
         print(f"   Individual Results: {[f'{r:.0f}' for r in all_results]}")
 
-        # 保存综合结果
+
         final_results = {
             'eval_seeds': EVAL_SEEDS[:len(all_results)],
             'seed_means': all_results,
@@ -568,19 +557,19 @@ def main():
             'episodes_per_seed': NUM_EPISODES
         }
 
-        # 保存JSON
+
         with open('./multi_seed_evaluation_results.json', 'w') as f:
             json.dump(final_results, f, indent=2)
 
-        # 🆕 保存numpy数据用于可视化
+
         np.savez('./prefer_evaluation_data.npz',
                  episode_data=all_episode_data,
                  seed_data=all_seed_data,
                  summary=final_results)
 
-        print(f"📊 数据已保存到: baseline_evaluation_data.npz")
+        print(f"📊 save to: baseline_evaluation_data.npz")
 
-        # 🆕 绘制多种子结果图
+
         plot_multi_seed_results(final_results)
 
         print(f"\n✅ Multi-seed evaluation completed!")
@@ -590,14 +579,14 @@ def main():
 
 
 def plot_multi_seed_results(results):
-    """绘制多种子评估结果"""
+
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
     fig.suptitle('Multi-Seed Evaluation Results', fontsize=16, fontweight='bold')
 
     seeds = results['eval_seeds']
     seed_means = results['seed_means']
 
-    # 1. 每个种子的结果
+
     axes[0].bar(range(len(seeds)), seed_means, alpha=0.7, color='skyblue', edgecolor='black')
     axes[0].axhline(results['overall_mean'], color='red', linestyle='--',
                     label=f'Overall Mean: {results["overall_mean"]:.1f}')
@@ -607,11 +596,11 @@ def plot_multi_seed_results(results):
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
 
-    # 设置x轴标签为实际种子值
+
     axes[0].set_xticks(range(len(seeds)))
     axes[0].set_xticklabels([str(s) for s in seeds], rotation=45)
 
-    # 2. 分布直方图
+
     axes[1].hist(seed_means, bins=min(8, len(seed_means)), alpha=0.7,
                  color='lightgreen', edgecolor='black')
     axes[1].axvline(results['overall_mean'], color='red', linestyle='--',
@@ -622,7 +611,7 @@ def plot_multi_seed_results(results):
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
 
-    # 3. 统计摘要
+
     axes[2].axis('off')
     stats_text = f"""
 Multi-Seed Evaluation Summary
@@ -650,7 +639,7 @@ Individual Results:
 
     plt.tight_layout()
 
-    # 保存图片
+
     plot_filename = f'./multi_seed_evaluation_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
     print(f"📊 Multi-seed plots saved to: {plot_filename}")
