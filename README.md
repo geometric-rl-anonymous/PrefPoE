@@ -1,8 +1,6 @@
-------
-
 # Learning Where to Explore: Advantage-Guided Preference-of-Experts for Policy Optimization(PrefPoE)
 
-This repository contains the evaluation script and pretrained model for the **HalfCheetah-v4** environment using the **PrefPoE** algorithm, as described in our upcoming ICLR submission.
+This repository contains the evaluation script and pretrained model for **PrefPoE on HalfCheetah-v4**, enabling **reproduction of results** from our ICLR submission.🤗
 
 ## 📂 Repository Structure
 
@@ -47,7 +45,7 @@ True Episode Returns - Mean: 5319.70 ± 1957.73
 All numerical results and plots will be saved automatically:
 
 ```
-📊 数据已保存到: baseline_evaluation_data.npz  
+📊 save to: baseline_evaluation_data.npz  
 📊 Multi-seed plots saved to: ./multi_seed_evaluation_<timestamp>.png
 ```
 

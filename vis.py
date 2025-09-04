@@ -136,7 +136,7 @@ def make_env(env_id, capture_video=False, video_folder="./evaluation_videos", ga
     return thunk
 
 
-def evaluate_model(model_path, env_id="HalfCheetah-v4", num_episodes=10, capture_video=True, device="cuda", deterministic=True):  # 🆕 加这个参数
+def evaluate_model(model_path, env_id="HalfCheetah-v4", num_episodes=10, capture_video=True, device="cuda", deterministic=True):
     """Evaluate model with same setup as training"""
     print(f"Starting model evaluation: {model_path}")
     print(f"Number of episodes: {num_episodes}")
@@ -451,7 +451,7 @@ def main():
     NUM_EPISODES = 10
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-    EVAL_SEEDS = [0, 1, 42, 123, 456, 789, 1234, 2023, 3141, 9999]  # 10个种子
+    EVAL_SEEDS = [0, 1, 42, 123, 456, 789, 1234, 2023, 3141, 9999]  # 10 seeds
     CAPTURE_VIDEO_SEED = -1
 
     print("🎲 Multi-Seed PPO Model Evaluation")
